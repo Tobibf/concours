@@ -9,6 +9,7 @@ const url = "mongodb://localhost:27017";
 const dbName = "projets";
 const collectionName = "concours";
 const collectionName1 = "responses";
+const user_id = 0; // Must be a variable of session
 
 /* GET concours listing. */
 router.get("/", async function (req, res, next) {
@@ -16,7 +17,7 @@ router.get("/", async function (req, res, next) {
   const client = new MongoClient(url);
   await client.connect();
   const db = client.db(dbName);
-  console.log("Connected correctly to server");
+
   // find all concours
   const concours = await db.collection(collectionName).find();
   await concours.forEach((ccr) => {
@@ -24,17 +25,46 @@ router.get("/", async function (req, res, next) {
   });
 
   // send the result as JSON
-  res.send(JSON.stringify(list));
+  if (list.length > 0) {
+    res.send(JSON.stringify(list));
+  } else {
+    res.send("Please create a new concour");
+  }
+
   //close the connection
   await client.close();
 });
 
 /* Add new Concours */
-router.post("/", async function (req, res, next) {
-  let name = req.body.name;
+router.post("/addConcours", async function (req, res, next) {
+  let name = String(req.body.name);
   let start_at = req.body.start_at;
   let end_at = req.body.end_at;
   let duration = req.body.duration;
+
+  let questions = [
+    {
+      id: Date.now(),
+      content: "Quelle est la capitale du Burkina ?",
+      responses: ["Ouagadougou", "Bobo Dioulasso"],
+      answer: "Ouagadougou",
+      mark: 2,
+    },
+    {
+      id: Date.now(),
+      content: "Quelle est la capitale du Mali ?",
+      responses: ["Dori", "Bamako", "Léo"],
+      answer: "Bamako",
+      mark: 3,
+    },
+    {
+      id: Date.now(),
+      content: "Quelle est la capitale de la France ?",
+      responses: ["Paris", "Lyon"],
+      answer: "Paris",
+      mark: 5,
+    },
+  ];
 
   let concoursAdd = {
     id: Date.now(),
@@ -42,69 +72,25 @@ router.post("/", async function (req, res, next) {
     start_at: new Date(start_at),
     end_at: new Date(end_at),
     duration: duration,
-    questions: [
-      {
-        id: Date.now(),
-        content: "Quelle est la capitale du Burkina ?",
-        responses: ["Ouagadougou", "Bobo Dioulasso"],
-        answer: "Ouagadougou",
-      },
-      {
-        id: Date.now(),
-        content: "Quelle est la capitale du Mali ?",
-        responses: ["Dori", "Bamako", "Léo"],
-        answer: "Bamako",
-      },
-      {
-        id: Date.now(),
-        content: "Quelle est la capitale de la France ?",
-        responses: ["Paris", "Lyon"],
-        answer: "Paris",
-      },
-    ],
+    questions: questions,
     created_at: Date.now(),
     updated_at: Date.now(),
   };
-  // let questions = [
-  //   {
-  //     id : Date.now(),
-  //     content : "Quelle est la capitale du Burkina ?",
-  //     responses : [
-  //       "Ouagadougou", "Bobo Dioulasso"
-  //     ],
-  //     answer : "Ouagadougou"
-  //   },
-  //   {
-  //     id : Date.now(),
-  //     content : "Quelle est la capitale du Mali ?",
-  //     responses : [
-  //       "Dori", "Bamako", "Léo"
-  //     ],
-  //     answer : "Bamako"
-  //   },
-  //   {
-  //     id : Date.now(),
-  //     content : "Quelle est la capitale de la France ?",
-  //     responses : [
-  //       "Paris", "Lyon"
-  //     ],
-  //     answer : "Paris"
-  //   },
-  // ];
 
   const client = new MongoClient(url);
   await client.connect();
   const db = client.db(dbName);
   console.log("Connected correctly to server");
+
   // insert in concours collections
   await db.collection(collectionName).insertOne(concoursAdd);
-  // await db.collection(collectionName1).insertOne(questions);
+
   res.send(JSON.stringify(concoursAdd));
   //close the connection
   await client.close();
 });
 
-/* GET concour from search by id. */
+/* GET concours from search by id. */
 router.get("/show/:id", async function (req, res, next) {
   let concoursList = [];
   let newCr;
@@ -118,64 +104,99 @@ router.get("/show/:id", async function (req, res, next) {
   // find concours by id
   const concours = await db.collection(collectionName).find({ id: id });
 
-  await concours.forEach((concour) => {
-    concoursList.push(concour);
+  await concours.forEach((cr) => {
+    concoursList.push(cr);
   });
 
   if (concoursList.length > 0) {
     newCr = concoursList[0];
+    // send the result as JSON
+    res.send(JSON.stringify(newCr));
+  } else {
+    res.send("This concour does not exist");
   }
-
-  // send the result as JSON
-  res.send(JSON.stringify(newCr));
   //close the connection
   await client.close();
 });
 
 /* Delete concours by id. */
-router.delete("/:id", async function (req, res, next) {
-  // Get id of concours
-  let id = Number(req.params.id);
+router.delete("/delete/:id", async function (req, res, next) {
+  let id = Number(req.params.id); // Get id of concours
+
   const client = new MongoClient(url);
   await client.connect();
   const db = client.db(dbName);
-  console.log("Connected correctly to server");
-  // find all concours
-  await db.collection(collectionName).deleteOne({ id: id });
 
-  // send the result as JSON
-  res.send(JSON.stringify("Concours " + id + " successfully delete"));
+  // find all concours
+  const result = await db.collection(collectionName).deleteOne({ id: id });
+
+  if (result.deletedCount > 0) {
+    // send the result as JSON
+    res.send(JSON.stringify("Concour " + id + " successfully delete"));
+  } else {
+    res.send("Concour doest not exist!");
+  }
+
   //close the connection
   await client.close();
 });
 
 /* Save concours answers. */
-router.post("/save/:id", async function (req, res, next) {
+router.post("/save/answers", async function (req, res, next) {
+  console.log(req.body);
   let name = req.body.name; // Name of the user
   let start_at = req.body.start_at;
   let end_at = req.body.end_at;
   let duration = req.body.duration;
-  let cr_id = req.body.concourse_id;
-
-  let responses = {
-    id: Date.now(),
-    cr_id: cr_id,
-    name: name,
-    start_at: new Date(start_at),
-    end_at: new Date(end_at),
-    duration: duration,
-    answers: [],
-    created_at: Date.now(),
-    updated_at: Date.now(),
-  };
+  let cr_id = Number(req.body.cr_id);
+  let answersList = [];
+  let concoursList = [];
+  let newCr;
 
   const client = new MongoClient(url);
   await client.connect();
   const db = client.db(dbName);
 
-  // insert in concours collections
-  await db.collection(collectionName1).insertOne({ responses });
-  res.send("ok");
+  // find concours by id which is performing
+  const concours = await db.collection(collectionName).find({ id: cr_id });
+
+  await concours.forEach((cr) => {
+    concoursList.push(cr);
+  });
+
+  if (concoursList.length > 0) {
+    newCr = concoursList[0];
+
+    let answer = null;
+    // Get all answers of user
+    for (let i = 0; i < newCr.questions.length; i++) {
+      // Put the responses of each question
+      // answer = 0;
+      // answersList.push();
+    }
+    answersList = ["Ouagadougou", "Bamako", "Frank"];
+
+    // Create user answers
+    let responses = {
+      id: Date.now(),
+      cr_id: cr_id,
+      name: name,
+      user_id: user_id,
+      start_at: new Date(start_at),
+      end_at: new Date(end_at),
+      duration: duration,
+      answers: answersList,
+      note: 0,
+      created_at: Date.now(),
+      updated_at: Date.now(),
+    };
+
+    // insert in concours collections
+    await db.collection(collectionName1).insertOne({ responses });
+    res.send("ok");
+  } else {
+    res.send("Concour does not exist");
+  }
   //close the connection
   await client.close();
 });
@@ -185,7 +206,7 @@ router.get("/answer/:id", async function (req, res, next) {
   let note = 0;
   let concoursList = [];
   let newCr;
-  let answsersList = [];
+  let answersList = [];
   let newAnswer;
 
   let id = Number(req.params.id);
@@ -194,15 +215,17 @@ router.get("/answer/:id", async function (req, res, next) {
   await client.connect();
   const db = client.db(dbName);
 
-  // Find the anwsers of performer
-  const answers = await db.collection(collectionName1).find({ id: id });
+  // Find the answers of performer
+  const answers = await db
+    .collection(collectionName1)
+    .find({ id: id, user_id: user_id });
 
   await answers.forEach((answer) => {
-    answsersList.push(answer);
+    answersList.push(answer);
   });
 
-  if (answsersList.length > 0) {
-    newAnswer = answsersList[0];
+  if (answersList.length > 0) {
+    newAnswer = answersList[0];
   }
 
   // find concours by id
@@ -219,8 +242,44 @@ router.get("/answer/:id", async function (req, res, next) {
   }
 
   // now let make correction
+  for (let i = 0; i < newCr.questions.length; i++) {
+    if (newCr.questions[i].answer == newAnswer.answers[i]) {
+      note += newCr.questions[i].mark;
+    }
+  }
 
   res.send(note);
+  //close the connection
+  await client.close();
+});
+
+/* Get result of Performer. */
+router.get("/result/:id", async function (req, res, next) {
+  let answersList = [];
+  let newAnswer;
+
+  let id = Number(req.params.id);
+
+  const client = new MongoClient(url);
+  await client.connect();
+  const db = client.db(dbName);
+
+  // Find the answers of performer
+  const answers = await db
+    .collection(collectionName1)
+    .find({ id: id, user_id: user_id });
+
+  await answers.forEach((answer) => {
+    answersList.push(answer);
+  });
+
+  if (answersList.length > 0) {
+    newAnswer = answersList[0];
+  }
+
+  // Send the answers of the user
+  res.send(JSON.stringify(newAnswer));
+
   //close the connection
   await client.close();
 });
