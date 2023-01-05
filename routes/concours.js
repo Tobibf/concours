@@ -143,7 +143,6 @@ router.delete("/delete/:id", async function (req, res, next) {
 
 /* Save concours answers. */
 router.post("/save/answers", async function (req, res, next) {
-  console.log(req.body);
   let name = req.body.name; // Name of the user
   let start_at = req.body.start_at;
   let end_at = req.body.end_at;
@@ -163,7 +162,7 @@ router.post("/save/answers", async function (req, res, next) {
   await concours.forEach((cr) => {
     concoursList.push(cr);
   });
-
+  // res.send(JSON.stringify(concoursList));
   if (concoursList.length > 0) {
     newCr = concoursList[0];
 
@@ -192,7 +191,7 @@ router.post("/save/answers", async function (req, res, next) {
     };
 
     // insert in concours collections
-    await db.collection(collectionName1).insertOne({ responses });
+    await db.collection(collectionName1).insertOne(responses);
     res.send("ok");
   } else {
     res.send("Concour does not exist");
@@ -201,7 +200,6 @@ router.post("/save/answers", async function (req, res, next) {
   await client.close();
 });
 
-/* Correct concours answers. */
 router.get("/answer/:id", async function (req, res, next) {
   let note = 0;
   let concoursList = [];
@@ -209,7 +207,7 @@ router.get("/answer/:id", async function (req, res, next) {
   let answersList = [];
   let newAnswer;
 
-  let id = Number(req.params.id);
+  let id = Number(req.params.id); // ID of the answers of performer
 
   const client = new MongoClient(url);
   await client.connect();
@@ -226,29 +224,65 @@ router.get("/answer/:id", async function (req, res, next) {
 
   if (answersList.length > 0) {
     newAnswer = answersList[0];
+
+    // Find the answers of performer
+    const concours = await db
+      .collection(collectionName)
+      .find({ id: newAnswer.cr_id });
+
+    await concours.forEach((cr) => {
+      concoursList.push(cr);
+    });
+
+    if (concoursList.length > 0) {
+      newCr = concoursList[0];
+
+      // now let make correction
+      for (let i = 0; i < newCr.questions.length; i++) {
+        if (newCr.questions[i].answer == newAnswer.answers[i]) {
+          note += newCr.questions[i].mark;
+        }
+      }
+
+      // Update Answer note
+      let answer = await db
+        .collection(collectionName1)
+        .findOneAndUpdate({ id: id }, { $set: { note: note } }, { new: true });
+
+      res.send(JSON.stringify(answer));
+    } else {
+      res.send("Contact the administrator");
+    }
+  } else {
+    res.send("Answer doest not exist");
   }
 
-  // find concours by id
-  const concours = await db
-    .collection(collectionName)
-    .find({ id: newAnswer.cr_id });
+  //close the connection
+  await client.close();
+});
 
-  await concours.forEach((concour) => {
-    concoursList.push(concour);
+/* View of All concours answers of a specific User. */
+router.get("/answers", async function (req, res, next) {
+  let answersList = [];
+
+  const client = new MongoClient(url);
+  await client.connect();
+  const db = client.db(dbName);
+
+  // Find the answers of performer
+  const answers = await db
+    .collection(collectionName1)
+    .find({ user_id: user_id });
+
+  await answers.forEach((answer) => {
+    answersList.push(answer);
   });
 
-  if (concoursList.length > 0) {
-    newCr = concoursList[0];
+  if (answersList.length > 0) {
+    res.send(JSON.stringify(answersList));
+  } else {
+    res.send("No answer found for this user");
   }
-
-  // now let make correction
-  for (let i = 0; i < newCr.questions.length; i++) {
-    if (newCr.questions[i].answer == newAnswer.answers[i]) {
-      note += newCr.questions[i].mark;
-    }
-  }
-
-  res.send(note);
   //close the connection
   await client.close();
 });
@@ -258,7 +292,7 @@ router.get("/result/:id", async function (req, res, next) {
   let answersList = [];
   let newAnswer;
 
-  let id = Number(req.params.id);
+  let id = Number(req.params.id); // Id of the answer
 
   const client = new MongoClient(url);
   await client.connect();
@@ -275,10 +309,11 @@ router.get("/result/:id", async function (req, res, next) {
 
   if (answersList.length > 0) {
     newAnswer = answersList[0];
+    // Send the answers of the user
+    res.send(JSON.stringify(newAnswer));
+  } else {
+    res.send("No results found");
   }
-
-  // Send the answers of the user
-  res.send(JSON.stringify(newAnswer));
 
   //close the connection
   await client.close();
