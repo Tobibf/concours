@@ -1,5 +1,10 @@
 # concours
 
+## Membres du Groupe
+AHAIZINTA Laila
+TANKOANO Romaric
+TRAORE Ulrich
+
 Ceci est un projet de classe, consistant à :
 
 
