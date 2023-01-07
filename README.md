@@ -26,4 +26,4 @@ concours) ;
 ·Affichage des résultats.
 
 
-**Remarque** :  les 2 fonctionnalités soulignées ne nous incombe pas; mais s'ont nécessaire pour nos traitements.
+**Remarque** :  les 2 fonctionnalités soulignées ne nous incombent pas; mais sont nécessaires pour nos traitements.
